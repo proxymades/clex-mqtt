@@ -592,7 +592,10 @@ tbody tr:hover { background: #fdfdff; }
 .account-sidebar .nav-link:hover { background:#eceeeb; }
 .account-sidebar .nav-link.active { background:#e8eae8; }
 .account-main { max-width:1200px; }
-.account-mqtt-users-table { min-width:600px; }
+.account-mqtt-users-table { min-width:940px; }
+.account-topic-filters { display:grid; gap:8px; min-width:180px; max-width:280px; }
+.account-topic-filters .account-copy { align-items:flex-start; justify-content:space-between; }
+.account-topic-filters code { min-width:0; font-size:11px; line-height:1.6; }
 .account-usage { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; margin-bottom:24px; }
 .account-usage > div { border:1px solid var(--border); border-radius:14px; background:white; padding:18px; display:flex; flex-direction:column; gap:10px; }
 .account-usage span { color:var(--muted); font-size:12px; }
