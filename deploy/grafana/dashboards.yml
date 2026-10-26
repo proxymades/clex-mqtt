@@ -1,0 +1,12 @@
+apiVersion: 1
+providers:
+  - name: CLEX MQTT
+    orgId: 1
+    folder: CLEX MQTT
+    folderUid: clex-mqtt
+    type: file
+    disableDeletion: true
+    updateIntervalSeconds: 30
+    allowUiUpdates: false
+    options:
+      path: /etc/grafana/dashboards

@@ -1,0 +1,2 @@
+# Preserve upstream legal texts byte for byte.
+third-party/licenses/*.txt -text -whitespace

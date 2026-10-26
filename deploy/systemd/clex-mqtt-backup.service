@@ -1,0 +1,31 @@
+[Unit]
+Description=CLEX MQTT verified local backup
+Documentation=file:/opt/clex-mqtt/docs/backups.md
+Wants=postgresql@17-main.service
+After=postgresql@17-main.service
+StartLimitIntervalSec=0
+
+[Service]
+Type=oneshot
+User=root
+Group=root
+ExecStart=/usr/local/sbin/clex-mqtt-backup --config /etc/clex-mqtt/backup.json create
+UMask=0077
+Nice=10
+IOSchedulingClass=idle
+TimeoutStartSec=6h
+Restart=on-failure
+RestartSec=15min
+NoNewPrivileges=true
+AmbientCapabilities=CAP_SETUID CAP_SETGID
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+RestrictNamespaces=true
+LockPersonality=true
+ReadWritePaths=/var/backups/clex-mqtt

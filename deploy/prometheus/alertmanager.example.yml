@@ -1,0 +1,29 @@
+{
+  "global": {
+    "resolve_timeout": "5m"
+  },
+  "route": {
+    "receiver": "telegram",
+    "group_by": [
+      "alertname",
+      "instance"
+    ],
+    "group_wait": "10s",
+    "group_interval": "1m",
+    "repeat_interval": "4h"
+  },
+  "receivers": [
+    {
+      "name": "telegram",
+      "telegram_configs": [
+        {
+          "bot_token_file": "/etc/prometheus/secrets/telegram-bot-token",
+          "chat_id": 123456789,
+          "send_resolved": true,
+          "parse_mode": "",
+          "message": "{{ if eq .Status \"firing\" }}CLEX MQTT: предупреждение{{ else }}CLEX MQTT: восстановлено{{ end }}\n{{ range .Alerts }}{{ .Annotations.summary }}\n{{ .Annotations.description }}\n{{ end }}"
+        }
+      ]
+    }
+  ]
+}

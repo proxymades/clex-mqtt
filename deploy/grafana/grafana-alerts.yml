@@ -1,0 +1,11 @@
+groups:
+  - name: grafana
+    rules:
+      - alert: GrafanaDown
+        expr: up{job="grafana"} == 0
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: Grafana недоступна
+          description: Grafana не отвечает локальному Prometheus более двух минут.

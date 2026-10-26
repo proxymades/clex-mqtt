@@ -1,0 +1,345 @@
+{
+  "rule_files": [
+    "backup-alerts.yml"
+  ],
+  "evaluation_interval": "1m",
+  "tests": [
+    {
+      "interval": "1m",
+      "input_series": [
+        {
+          "series": "up{job=\"node\",instance=\"127.0.0.1:9100\"}",
+          "values": "1+0x1800"
+        },
+        {
+          "series": "clex_mqtt_backup_last_run_success{job=\"node\",instance=\"127.0.0.1:9100\"}",
+          "values": "1+0x1800"
+        },
+        {
+          "series": "clex_mqtt_backup_last_success_timestamp_seconds{job=\"node\",instance=\"127.0.0.1:9100\"}",
+          "values": "0+0x1800"
+        },
+        {
+          "series": "clex_mqtt_backup_status_timestamp_seconds{job=\"node\",instance=\"127.0.0.1:9100\"}",
+          "values": "0+60x1800"
+        },
+        {
+          "series": "clex_mqtt_backup_status_collection_success{job=\"node\",instance=\"127.0.0.1:9100\"}",
+          "values": "1+0x1800"
+        }
+      ],
+      "alert_rule_test": [
+        {
+          "eval_time": "10m",
+          "alertname": "ClexMqttBackupFailed",
+          "exp_alerts": []
+        },
+        {
+          "eval_time": "10m",
+          "alertname": "ClexMqttBackupStale",
+          "exp_alerts": []
+        },
+        {
+          "eval_time": "10m",
+          "alertname": "ClexMqttBackupStatusUnavailable",
+          "exp_alerts": []
+        }
+      ]
+    },
+    {
+      "interval": "1m",
+      "input_series": [
+        {
+          "series": "up{job=\"node\",instance=\"127.0.0.1:9100\"}",
+          "values": "1+0x1800"
+        },
+        {
+          "series": "clex_mqtt_backup_last_run_success{job=\"node\",instance=\"127.0.0.1:9100\"}",
+          "values": "0+0x1800"
+        },
+        {
+          "series": "clex_mqtt_backup_last_success_timestamp_seconds{job=\"node\",instance=\"127.0.0.1:9100\"}",
+          "values": "0+0x1800"
+        },
+        {
+          "series": "clex_mqtt_backup_status_timestamp_seconds{job=\"node\",instance=\"127.0.0.1:9100\"}",
+          "values": "0+60x1800"
+        },
+        {
+          "series": "clex_mqtt_backup_status_collection_success{job=\"node\",instance=\"127.0.0.1:9100\"}",
+          "values": "1+0x1800"
+        }
+      ],
+      "alert_rule_test": [
+        {
+          "eval_time": "3m",
+          "alertname": "ClexMqttBackupFailed",
+          "exp_alerts": [
+            {
+              "exp_labels": {
+                "job": "node",
+                "instance": "127.0.0.1:9100",
+                "severity": "critical"
+              },
+              "exp_annotations": {
+                "summary": "Резервное копирование завершилось ошибкой",
+                "description": "Проверьте журнал clex-mqtt-backup.service; следующая успешная попытка снимет предупреждение."
+              }
+            }
+          ]
+        },
+        {
+          "eval_time": "3m",
+          "alertname": "ClexMqttBackupStale",
+          "exp_alerts": []
+        },
+        {
+          "eval_time": "3m",
+          "alertname": "ClexMqttBackupStatusUnavailable",
+          "exp_alerts": []
+        }
+      ]
+    },
+    {
+      "interval": "1m",
+      "input_series": [
+        {
+          "series": "up{job=\"node\",instance=\"127.0.0.1:9100\"}",
+          "values": "1+0x1800"
+        },
+        {
+          "series": "clex_mqtt_backup_last_run_success{job=\"node\",instance=\"127.0.0.1:9100\"}",
+          "values": "1+0x1800"
+        },
+        {
+          "series": "clex_mqtt_backup_last_success_timestamp_seconds{job=\"node\",instance=\"127.0.0.1:9100\"}",
+          "values": "0+0x1800"
+        },
+        {
+          "series": "clex_mqtt_backup_status_timestamp_seconds{job=\"node\",instance=\"127.0.0.1:9100\"}",
+          "values": "0+60x1800"
+        },
+        {
+          "series": "clex_mqtt_backup_status_collection_success{job=\"node\",instance=\"127.0.0.1:9100\"}",
+          "values": "1+0x1800"
+        }
+      ],
+      "alert_rule_test": [
+        {
+          "eval_time": "26h4m",
+          "alertname": "ClexMqttBackupFailed",
+          "exp_alerts": []
+        },
+        {
+          "eval_time": "26h4m",
+          "alertname": "ClexMqttBackupStale",
+          "exp_alerts": []
+        },
+        {
+          "eval_time": "26h4m",
+          "alertname": "ClexMqttBackupStatusUnavailable",
+          "exp_alerts": []
+        },
+        {
+          "eval_time": "26h6m",
+          "alertname": "ClexMqttBackupFailed",
+          "exp_alerts": []
+        },
+        {
+          "eval_time": "26h6m",
+          "alertname": "ClexMqttBackupStale",
+          "exp_alerts": [
+            {
+              "exp_labels": {
+                "job": "node",
+                "instance": "127.0.0.1:9100",
+                "severity": "critical"
+              },
+              "exp_annotations": {
+                "summary": "Больше 26 часов нет успешной резервной копии",
+                "description": "Проверьте таймер, свободное место и журнал резервного копирования."
+              }
+            }
+          ]
+        },
+        {
+          "eval_time": "26h6m",
+          "alertname": "ClexMqttBackupStatusUnavailable",
+          "exp_alerts": []
+        }
+      ]
+    },
+    {
+      "interval": "1m",
+      "input_series": [
+        {
+          "series": "up{job=\"node\",instance=\"127.0.0.1:9100\"}",
+          "values": "1+0x10"
+        }
+      ],
+      "alert_rule_test": [
+        {
+          "eval_time": "6m",
+          "alertname": "ClexMqttBackupFailed",
+          "exp_alerts": []
+        },
+        {
+          "eval_time": "6m",
+          "alertname": "ClexMqttBackupStale",
+          "exp_alerts": []
+        },
+        {
+          "eval_time": "6m",
+          "alertname": "ClexMqttBackupStatusUnavailable",
+          "exp_alerts": [
+            {
+              "exp_labels": {
+                "job": "node",
+                "instance": "127.0.0.1:9100",
+                "severity": "warning"
+              },
+              "exp_annotations": {
+                "summary": "Не обновляется состояние резервных копий",
+                "description": "Проверьте clex-mqtt-backup-status.timer и clex-mqtt-backup-status.service."
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "interval": "1m",
+      "input_series": [
+        {
+          "series": "up{job=\"node\",instance=\"127.0.0.1:9100\"}",
+          "values": "0+0x10"
+        }
+      ],
+      "alert_rule_test": [
+        {
+          "eval_time": "6m",
+          "alertname": "ClexMqttBackupFailed",
+          "exp_alerts": []
+        },
+        {
+          "eval_time": "6m",
+          "alertname": "ClexMqttBackupStale",
+          "exp_alerts": []
+        },
+        {
+          "eval_time": "6m",
+          "alertname": "ClexMqttBackupStatusUnavailable",
+          "exp_alerts": []
+        }
+      ]
+    },
+    {
+      "interval": "1m",
+      "input_series": [
+        {
+          "series": "up{job=\"node\",instance=\"127.0.0.1:9100\"}",
+          "values": "1+0x1800"
+        },
+        {
+          "series": "clex_mqtt_backup_last_run_success{job=\"node\",instance=\"127.0.0.1:9100\"}",
+          "values": "1+0x1800"
+        },
+        {
+          "series": "clex_mqtt_backup_last_success_timestamp_seconds{job=\"node\",instance=\"127.0.0.1:9100\"}",
+          "values": "0+0x1800"
+        },
+        {
+          "series": "clex_mqtt_backup_status_timestamp_seconds{job=\"node\",instance=\"127.0.0.1:9100\"}",
+          "values": "0+0x1800"
+        },
+        {
+          "series": "clex_mqtt_backup_status_collection_success{job=\"node\",instance=\"127.0.0.1:9100\"}",
+          "values": "1+0x1800"
+        }
+      ],
+      "alert_rule_test": [
+        {
+          "eval_time": "9m",
+          "alertname": "ClexMqttBackupFailed",
+          "exp_alerts": []
+        },
+        {
+          "eval_time": "9m",
+          "alertname": "ClexMqttBackupStale",
+          "exp_alerts": []
+        },
+        {
+          "eval_time": "9m",
+          "alertname": "ClexMqttBackupStatusUnavailable",
+          "exp_alerts": [
+            {
+              "exp_labels": {
+                "job": "node",
+                "instance": "127.0.0.1:9100",
+                "severity": "warning"
+              },
+              "exp_annotations": {
+                "summary": "Не обновляется состояние резервных копий",
+                "description": "Проверьте clex-mqtt-backup-status.timer и clex-mqtt-backup-status.service."
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "interval": "1m",
+      "input_series": [
+        {
+          "series": "up{job=\"node\",instance=\"127.0.0.1:9100\"}",
+          "values": "1+0x1800"
+        },
+        {
+          "series": "clex_mqtt_backup_last_run_success{job=\"node\",instance=\"127.0.0.1:9100\"}",
+          "values": "1+0x1800"
+        },
+        {
+          "series": "clex_mqtt_backup_last_success_timestamp_seconds{job=\"node\",instance=\"127.0.0.1:9100\"}",
+          "values": "0+0x1800"
+        },
+        {
+          "series": "clex_mqtt_backup_status_timestamp_seconds{job=\"node\",instance=\"127.0.0.1:9100\"}",
+          "values": "0+60x1800"
+        },
+        {
+          "series": "clex_mqtt_backup_status_collection_success{job=\"node\",instance=\"127.0.0.1:9100\"}",
+          "values": "0+0x1800"
+        }
+      ],
+      "alert_rule_test": [
+        {
+          "eval_time": "6m",
+          "alertname": "ClexMqttBackupFailed",
+          "exp_alerts": []
+        },
+        {
+          "eval_time": "6m",
+          "alertname": "ClexMqttBackupStale",
+          "exp_alerts": []
+        },
+        {
+          "eval_time": "6m",
+          "alertname": "ClexMqttBackupStatusUnavailable",
+          "exp_alerts": [
+            {
+              "exp_labels": {
+                "job": "node",
+                "instance": "127.0.0.1:9100",
+                "severity": "warning"
+              },
+              "exp_annotations": {
+                "summary": "Не обновляется состояние резервных копий",
+                "description": "Проверьте clex-mqtt-backup-status.timer и clex-mqtt-backup-status.service."
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

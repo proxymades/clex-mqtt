@@ -1,0 +1,36 @@
+# Runtime configuration and credentials
+.env
+.env.*
+!.env.example
+!.env.production.example
+secrets/
+certs/
+*.pem
+*.key
+*.p12
+*.pfx
+*.pgpass
+# Build, dependencies, local tools and database artifacts
+/target/
+/node_modules/
+/frontend/node_modules/
+/frontend/dist/
+/.cache/
+/work/
+*.log
+*.pid
+__pycache__/
+*.py[cod]
+*.dump
+*.sql.gz
+.DS_Store
+.idea/
+.vscode/
+/AGENTS.md
+
+# Private backup bundles
+backups/
+**/backup-*/
+**/.pending-*/
+**/database-role.json
+**/files.tar.gz

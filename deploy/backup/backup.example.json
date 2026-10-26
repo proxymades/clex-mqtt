@@ -1,0 +1,42 @@
+{
+  "version": 1,
+  "destination": "/var/backups/clex-mqtt",
+  "keep": 7,
+  "postgres_bin": "/usr/lib/postgresql/17/bin",
+  "host": "/var/run/postgresql",
+  "port": 5432,
+  "database": "clex_mqtt",
+  "database_role": "clex_mqtt",
+  "postgres_user": "postgres",
+  "postgres_os_user": "postgres",
+  "sources": [
+    {
+      "path": "/etc/clex-mqtt",
+      "required": true
+    },
+    {
+      "path": "/opt/clex-mqtt/clex-mqtt",
+      "required": true
+    },
+    {
+      "path": "/etc/systemd/system/clex-mqtt.service",
+      "required": true
+    },
+    {
+      "path": "/etc/systemd/system/clex-mqtt.service.d",
+      "required": false
+    },
+    {
+      "path": "/etc/nginx/sites-available/clex-mqtt",
+      "required": true
+    },
+    {
+      "path": "/etc/nginx/sites-available/default",
+      "required": false
+    },
+    {
+      "path": "/etc/letsencrypt",
+      "required": false
+    }
+  ]
+}

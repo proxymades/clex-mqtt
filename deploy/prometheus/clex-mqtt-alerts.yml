@@ -1,0 +1,44 @@
+# Starting thresholds; tune them for the target workload and queue limits.
+groups:
+  - name: clex-mqtt
+    rules:
+      - alert: ClexMqttScrapeUnavailable
+        expr: up{job="clex-mqtt"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: 'CLEX MQTT metrics endpoint is unavailable'
+          description: 'Check the broker listener, monitoring token and network route.'
+      - alert: ClexMqttDatabaseCollectionFailed
+        expr: clex_mqtt_database_up == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: 'CLEX MQTT database metrics collection is failing'
+          description: 'Check PostgreSQL connectivity, query timeouts and database load.'
+      - alert: ClexMqttDeliveryBacklog
+        expr: clex_mqtt_delivery_queue_messages{state="queued"} > 10000
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: 'CLEX MQTT delivery backlog is growing'
+          description: 'Check offline subscribers, receive windows and processing capacity.'
+      - alert: ClexMqttBridgeDisconnected
+        expr: clex_mqtt_bridges_enabled - clex_mqtt_bridges_connected > 0
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: 'An enabled CLEX MQTT bridge is reconnecting'
+          description: 'Inspect bridge connection status, remote access rules and TLS trust.'
+      - alert: ClexMqttStateLockLatency
+        expr: histogram_quantile(0.95, sum by (le, job, instance) (rate(clex_mqtt_storage_lock_wait_seconds_bucket[5m]))) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: 'CLEX MQTT state transactions are waiting for capacity'
+          description: 'Inspect PostgreSQL latency, connection pool usage and message fan-out.'

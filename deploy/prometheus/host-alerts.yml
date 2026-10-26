@@ -1,0 +1,69 @@
+{
+  "groups": [
+    {
+      "name": "clex-host",
+      "rules": [
+        {
+          "alert": "HostMetricsUnavailable",
+          "expr": "up{job=\"node\"} == 0",
+          "for": "2m",
+          "labels": {
+            "severity": "critical"
+          },
+          "annotations": {
+            "summary": "Не поступают показатели сервера",
+            "description": "Проверьте службу prometheus-node-exporter."
+          }
+        },
+        {
+          "alert": "HostDiskSpaceLow",
+          "expr": "node_filesystem_avail_bytes{job=\"node\",mountpoint=\"/\"} / node_filesystem_size_bytes{job=\"node\",mountpoint=\"/\"} < 0.10",
+          "for": "5m",
+          "labels": {
+            "severity": "critical"
+          },
+          "annotations": {
+            "summary": "На системном диске осталось меньше 10% свободного места",
+            "description": "Проверьте использование диска, журналы, базу данных и архивы."
+          }
+        },
+        {
+          "alert": "HostMemoryLow",
+          "expr": "node_memory_MemAvailable_bytes{job=\"node\"} / node_memory_MemTotal_bytes{job=\"node\"} < 0.10",
+          "for": "5m",
+          "labels": {
+            "severity": "warning"
+          },
+          "annotations": {
+            "summary": "Доступно меньше 10% оперативной памяти",
+            "description": "Проверьте потребление памяти процессами сервера."
+          }
+        },
+        {
+          "alert": "HostCpuBusy",
+          "expr": "1 - avg by (job, instance) (rate(node_cpu_seconds_total{job=\"node\",mode=\"idle\"}[5m])) > 0.90",
+          "for": "10m",
+          "labels": {
+            "severity": "warning"
+          },
+          "annotations": {
+            "summary": "Процессор загружен более чем на 90%",
+            "description": "Высокая загрузка сохраняется не менее 10 минут."
+          }
+        },
+        {
+          "alert": "HostInodesLow",
+          "expr": "node_filesystem_files_free{job=\"node\",mountpoint=\"/\"} / node_filesystem_files{job=\"node\",mountpoint=\"/\"} < 0.10",
+          "for": "5m",
+          "labels": {
+            "severity": "warning"
+          },
+          "annotations": {
+            "summary": "Заканчивается запас файлов на системном разделе",
+            "description": "Проверьте каталоги с большим количеством мелких файлов."
+          }
+        }
+      ]
+    }
+  ]
+}

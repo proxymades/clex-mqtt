@@ -1,0 +1,288 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+  shadowDatabaseUrl = env("SHADOW_DATABASE_URL")
+}
+
+model AdminUser {
+  id           String         @id @default(uuid()) @db.Uuid
+  username     String         @unique
+  passwordHash String         @map("password_hash")
+  enabled      Boolean        @default(true)
+  createdAt    DateTime       @default(now()) @map("created_at") @db.Timestamptz(3)
+  sessions     AdminSession[]
+  @@map("admin_users")
+}
+
+model AdminSession {
+  id        String    @id @default(uuid()) @db.Uuid
+  adminId   String    @map("admin_id") @db.Uuid
+  tokenHash Bytes     @unique @map("token_hash")
+  csrfHash  Bytes     @map("csrf_hash")
+  expiresAt DateTime  @map("expires_at") @db.Timestamptz(3)
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  admin     AdminUser @relation(fields: [adminId], references: [id], onDelete: Cascade)
+  @@index([expiresAt])
+  @@map("admin_sessions")
+}
+
+model Account {
+  id                String @id @default(uuid()) @db.Uuid
+  username          String @unique
+  passwordHash      String @map("password_hash")
+  enabled           Boolean @default(true)
+  maxMqttUsers      Int @default(10) @map("max_mqtt_users")
+  maxConnections    Int @default(10) @map("max_connections")
+  maxSessions       Int @default(100) @map("max_sessions")
+  maxQueuedMessages Int @default(1000) @map("max_queued_messages")
+  maxQueuedBytes    BigInt @default(8388608) @map("max_queued_bytes")
+  maxPublishRate    Int @default(20) @map("max_publish_rate")
+  publishWindow     BigInt @default(0) @map("publish_window")
+  publishCount      Int @default(0) @map("publish_count")
+  createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  sessions          AccountSession[]
+  mqttUsers         MqttUser[]
+  messages          Message[]
+  @@map("accounts")
+}
+
+model AccountSession {
+  id        String @id @default(uuid()) @db.Uuid
+  accountId String @map("account_id") @db.Uuid
+  tokenHash Bytes @unique @map("token_hash")
+  csrfHash  Bytes @map("csrf_hash")
+  expiresAt DateTime @map("expires_at") @db.Timestamptz(3)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  account   Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  @@index([accountId, createdAt])
+  @@index([expiresAt])
+  @@map("account_sessions")
+}
+
+model MqttUser {
+  ownerId       String? @map("owner_id") @db.Uuid
+  owner         Account? @relation(fields: [ownerId], references: [id], onDelete: Restrict)
+  accountLabel  String? @map("account_label")
+  id            String    @id @default(uuid()) @db.Uuid
+  username      String    @unique
+  passwordHash  String    @map("password_hash")
+  scramVerifier Json?     @map("scram_verifier")
+  requireClientCertificate Boolean @default(false) @map("require_client_certificate")
+  enabled       Boolean   @default(true)
+  superuser     Boolean   @default(false)
+  boundClientId Bytes?    @map("bound_client_id")
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  aclRules      AclRule[]
+  groups        MqttUserGroup[]
+  certificates  MqttClientCertificate[]
+  @@unique([ownerId, accountLabel])
+  @@index([ownerId])
+  @@map("mqtt_users")
+}
+
+model MqttClientCertificate {
+  id         String   @id @default(uuid()) @db.Uuid
+  mqttUserId String   @map("mqtt_user_id") @db.Uuid
+  fingerprint Bytes   @unique
+  label      String
+  subject    String
+  expiresAt  DateTime @map("expires_at") @db.Timestamptz(3)
+  enabled    Boolean  @default(true)
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  mqttUser   MqttUser @relation(fields: [mqttUserId], references: [id], onDelete: Cascade)
+  @@index([mqttUserId])
+  @@map("mqtt_client_certificates")
+}
+
+model AclRule {
+  id         String    @id @default(uuid()) @db.Uuid
+  mqttUserId String?   @map("mqtt_user_id") @db.Uuid
+  groupId    String?   @map("group_id") @db.Uuid
+  filter     String
+  publish    Boolean   @default(false)
+  subscribe  Boolean   @default(false)
+  allow      Boolean   @default(true)
+  priority   Int       @default(0)
+  mqttUser   MqttUser? @relation(fields: [mqttUserId], references: [id], onDelete: Cascade)
+  group      MqttAccessGroup? @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  @@index([mqttUserId, priority])
+  @@index([groupId])
+  @@map("mqtt_acl_rules")
+}
+
+model MqttAccessGroup {
+  id          String          @id @default(uuid()) @db.Uuid
+  name        String          @unique
+  description String          @default("")
+  enabled     Boolean         @default(true)
+  createdAt   DateTime        @default(now()) @map("created_at") @db.Timestamptz(3)
+  rules       AclRule[]
+  members     MqttUserGroup[]
+  @@map("mqtt_access_groups")
+}
+
+model MqttUserGroup {
+  mqttUserId String          @map("mqtt_user_id") @db.Uuid
+  groupId    String          @map("group_id") @db.Uuid
+  mqttUser   MqttUser        @relation(fields: [mqttUserId], references: [id], onDelete: Cascade)
+  group      MqttAccessGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  @@id([mqttUserId, groupId])
+  @@index([groupId])
+  @@map("mqtt_user_groups")
+}
+
+model Session {
+  id                   String          @id @default(uuid()) @db.Uuid
+  clientId             Bytes           @map("client_id")
+  principal            String
+  generation           BigInt          @unique @default(autoincrement())
+  protocol             Int
+  online               Boolean         @default(false)
+  expiryInterval       BigInt          @map("expiry_interval")
+  expiresAt            DateTime?       @map("expires_at") @db.Timestamptz(3)
+  willMessageId        String?         @map("will_message_id") @db.Uuid
+  willDelayInterval    BigInt          @default(0) @map("will_delay_interval")
+  willDueAt            DateTime?       @map("will_due_at") @db.Timestamptz(3)
+  createdAt            DateTime        @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt            DateTime        @default(now()) @map("updated_at") @db.Timestamptz(3)
+  queuedCount          BigInt?         @map("queued_count")
+  queuedBytes          BigInt?         @map("queued_bytes")
+  subscriptions        Subscription[]
+  deliveries           Delivery[]
+  incomingQos2         IncomingQos2[]
+  willMessage          Message?        @relation("SessionWill", fields: [willMessageId], references: [id], onDelete: Restrict)
+  @@unique([principal, clientId])
+  @@index([expiresAt])
+  @@index([willDueAt])
+  @@map("sessions")
+}
+
+model Subscription {
+  id                     String   @id @default(uuid()) @db.Uuid
+  sessionId              String   @map("session_id") @db.Uuid
+  filter                 String
+  qos                    Int
+  noLocal                Boolean  @default(false) @map("no_local")
+  retainAsPublished      Boolean  @default(false) @map("retain_as_published")
+  retainHandling         Int      @default(0) @map("retain_handling")
+  subscriptionIdentifier Int?     @map("subscription_identifier")
+  sharedLastSequence     BigInt   @default(0) @map("shared_last_sequence")
+  session                Session  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  @@unique([sessionId, filter])
+  @@map("subscriptions")
+}
+
+model Message {
+  ownerId        String? @map("owner_id") @db.Uuid
+  owner          Account? @relation(fields: [ownerId], references: [id], onDelete: Restrict)
+  compacted      Boolean @default(false)
+  id             String          @id @db.Uuid
+  topic          Bytes
+  payload        Bytes
+  qos            Int
+  retain         Boolean
+  properties     Json
+  sourceClientId Bytes?          @map("source_client_id")
+  sourcePrincipal String?        @map("source_principal")
+  expiresAt      DateTime?       @map("expires_at") @db.Timestamptz(3)
+  createdAt      DateTime        @default(now()) @map("created_at") @db.Timestamptz(3)
+  retained       Retained[]
+  deliveries     Delivery[]
+  incomingQos2   IncomingQos2[]
+  wills          Session[]       @relation("SessionWill")
+  bridgeDeliveries BridgeDelivery[]
+  @@index([expiresAt])
+  @@index([ownerId, compacted])
+  @@map("messages")
+}
+
+model Retained {
+  topic     Bytes   @id
+  messageId String  @map("message_id") @db.Uuid
+  message   Message @relation(fields: [messageId], references: [id], onDelete: Restrict)
+  @@index([messageId])
+  @@map("retained")
+}
+
+model Delivery {
+  id                      String   @id @db.Uuid
+  sequence                BigInt   @unique @default(autoincrement())
+  sessionId               String   @map("session_id") @db.Uuid
+  messageId               String   @map("message_id") @db.Uuid
+  qos                     Int
+  retain                  Boolean
+  packetId                Int?     @map("packet_id")
+  phase                   String   @default("queued")
+  subscriptionIdentifiers Json     @default("[]") @map("subscription_identifiers")
+  sharedFilter            String?  @map("shared_filter")
+  accountedBytes          BigInt?  @map("accounted_bytes")
+  session                 Session  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  message                 Message  @relation(fields: [messageId], references: [id], onDelete: Restrict)
+  @@unique([sessionId, packetId])
+  @@index([sessionId, sequence])
+  @@index([messageId])
+  @@index([sharedFilter])
+  @@map("deliveries")
+}
+
+model IncomingQos2 {
+  sessionId String   @map("session_id") @db.Uuid
+  packetId  Int      @map("packet_id")
+  messageId String?  @map("message_id") @db.Uuid
+  released  Boolean  @default(false)
+  session   Session  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  message   Message? @relation(fields: [messageId], references: [id], onDelete: Restrict)
+  @@id([sessionId, packetId])
+  @@index([messageId])
+  @@map("incoming_qos2")
+}
+
+model MqttBridge {
+  id             String   @id @db.Uuid
+  name           String   @unique
+  endpoint       String
+  username       String   @default("")
+  password       Bytes?
+  caPem          String?  @map("ca_pem")
+  rules          Json
+  enabled        Boolean  @default(true)
+  revision       BigInt   @default(1)
+  remoteRevision BigInt   @default(0) @map("remote_revision")
+  status         String   @default("connecting")
+  lastError      String?  @map("last_error")
+  connectedAt    DateTime? @map("connected_at") @db.Timestamptz(3)
+  received       BigInt   @default(0)
+  sent           BigInt   @default(0)
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  deliveries     BridgeDelivery[]
+  @@map("mqtt_bridges")
+}
+
+model BridgeDelivery {
+  id        String @id @db.Uuid
+  sequence  BigInt @unique @default(autoincrement())
+  bridgeId  String @map("bridge_id") @db.Uuid
+  messageId String @map("message_id") @db.Uuid
+  topic     Bytes
+  bridge    MqttBridge @relation(fields: [bridgeId], references: [id], onDelete: Cascade)
+  message   Message @relation(fields: [messageId], references: [id], onDelete: Restrict)
+  @@unique([bridgeId, messageId, topic])
+  @@index([bridgeId, sequence])
+  @@index([messageId])
+  @@map("bridge_deliveries")
+}
+
+model AuditEvent {
+  id        BigInt   @id @default(autoincrement())
+  actor     String
+  action    String
+  subject   String?
+  details   Json     @default("{}")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  @@index([createdAt])
+  @@map("audit_events")
+}

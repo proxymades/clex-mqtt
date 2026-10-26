@@ -1,0 +1,46 @@
+name: Checks
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:17-bookworm
+        env:
+          POSTGRES_USER: clex
+          POSTGRES_PASSWORD: test-only-password
+          POSTGRES_DB: clex_mqtt_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U clex -d clex_mqtt_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      CLEX_ENV: test
+      DATABASE_URL: postgresql://clex:test-only-password@127.0.0.1:5432/clex_mqtt_dev
+      TEST_DATABASE_URL: postgresql://clex:test-only-password@127.0.0.1:5432/clex_mqtt_test
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: '22.21.1'
+          cache: npm
+      - name: Install PostgreSQL 17 client tools
+        run: |
+          sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
+          sudo apt-get install -y --no-install-recommends postgresql-client-17
+          echo "/usr/lib/postgresql/17/bin" >> "$GITHUB_PATH"
+          /usr/lib/postgresql/17/bin/pg_dump --version
+          /usr/lib/postgresql/17/bin/pg_restore --version
+      - name: Install Rust toolchain
+        run: rustup toolchain install 1.93.1 --profile minimal --component rustfmt --component clippy
+      - run: npm ci
+      - name: Check source, frontend and isolated PostgreSQL integration
+        run: python3 scripts/check.py

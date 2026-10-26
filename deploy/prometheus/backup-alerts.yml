@@ -1,0 +1,45 @@
+{
+  "groups": [
+    {
+      "name": "clex-mqtt-backup",
+      "rules": [
+        {
+          "alert": "ClexMqttBackupFailed",
+          "expr": "clex_mqtt_backup_last_run_success{job=\"node\"} == 0",
+          "for": "2m",
+          "labels": {
+            "severity": "critical"
+          },
+          "annotations": {
+            "summary": "Резервное копирование завершилось ошибкой",
+            "description": "Проверьте журнал clex-mqtt-backup.service; следующая успешная попытка снимет предупреждение."
+          }
+        },
+        {
+          "alert": "ClexMqttBackupStale",
+          "expr": "time() - clex_mqtt_backup_last_success_timestamp_seconds{job=\"node\"} > 93600",
+          "for": "5m",
+          "labels": {
+            "severity": "critical"
+          },
+          "annotations": {
+            "summary": "Больше 26 часов нет успешной резервной копии",
+            "description": "Проверьте таймер, свободное место и журнал резервного копирования."
+          }
+        },
+        {
+          "alert": "ClexMqttBackupStatusUnavailable",
+          "expr": "(up{job=\"node\"} == 1) unless on (job, instance) ((clex_mqtt_backup_status_collection_success{job=\"node\"} == 1) and on (job, instance) (time() - clex_mqtt_backup_status_timestamp_seconds{job=\"node\"} <= 180))",
+          "for": "5m",
+          "labels": {
+            "severity": "warning"
+          },
+          "annotations": {
+            "summary": "Не обновляется состояние резервных копий",
+            "description": "Проверьте clex-mqtt-backup-status.timer и clex-mqtt-backup-status.service."
+          }
+        }
+      ]
+    }
+  ]
+}

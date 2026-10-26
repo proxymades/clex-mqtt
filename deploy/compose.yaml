@@ -1,0 +1,72 @@
+# Optional local development stack. Production is described in docs/deployment.md.
+# Invoke from the repository root with: docker compose --env-file .env -f deploy/compose.yaml ...
+x-broker: &broker
+  image: clex-mqtt:local
+  build:
+    context: ..
+    dockerfile: deploy/Dockerfile
+  environment: &broker-environment
+    DATABASE_URL: ${CLEX_COMPOSE_DATABASE_URL:?Set CLEX_COMPOSE_DATABASE_URL for the isolated Compose database}
+    CLEX_ENV: development
+    CLEX_MQTT_ADDR: 0.0.0.0:1883
+    CLEX_HTTP_ADDR: 0.0.0.0:8085
+    CLEX_PUBLIC_URL: http://127.0.0.1:8085
+    CLEX_COOKIE_SECURE: "false"
+    CLEX_DB_MAX_CONNECTIONS: "10"
+    CLEX_MAX_PACKET_BYTES: "1048576"
+    CLEX_MAX_CONNECTIONS: "1000"
+    CLEX_MAX_INFLIGHT: "32"
+    CLEX_MAX_PENDING: "10000"
+    CLEX_MAX_PENDING_BYTES: "67108864"
+    CLEX_BRIDGE_SECRET_KEY: ${CLEX_BRIDGE_SECRET_KEY:-}
+    CLEX_METRICS_TOKEN: ${CLEX_METRICS_TOKEN:-}
+    RUST_LOG: clex_mqtt=info,tower_http=warn
+  read_only: true
+  tmpfs:
+    - /tmp:rw,noexec,nosuid,size=16m
+  cap_drop:
+    - ALL
+  security_opt:
+    - no-new-privileges:true
+  init: true
+
+services:
+  postgres:
+    image: postgres:17-bookworm
+    environment:
+      POSTGRES_USER: ${CLEX_COMPOSE_DB_USER:?Set a dedicated Compose database user}
+      POSTGRES_PASSWORD: ${CLEX_COMPOSE_DB_PASSWORD:?Set a new Compose database password}
+      POSTGRES_DB: ${CLEX_COMPOSE_DB_NAME:?Set an isolated Compose database name}
+      POSTGRES_INITDB_ARGS: --encoding=UTF8
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    # No host port: the application reaches PostgreSQL over the Compose network.
+    restart: unless-stopped
+
+  migrate:
+    <<: *broker
+    command: ["migrate"]
+    profiles: ["tools"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  app:
+    <<: *broker
+    command: ["serve"]
+    ports:
+      - 127.0.0.1:1883:1883
+      - 127.0.0.1:8085:8085
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    stop_grace_period: 20s
+
+volumes:
+  postgres_data:

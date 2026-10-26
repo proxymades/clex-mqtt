@@ -1,0 +1,11 @@
+[Unit]
+Description=Refresh CLEX MQTT backup status every minute
+
+[Timer]
+OnBootSec=1min
+OnUnitActiveSec=1min
+AccuracySec=5s
+Unit=clex-mqtt-backup-status.service
+
+[Install]
+WantedBy=timers.target

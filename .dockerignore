@@ -1,0 +1,23 @@
+.git
+AGENTS.md
+.env
+.env.*
+secrets
+certs
+target
+node_modules
+frontend/node_modules
+frontend/dist
+.cache
+work
+*.log
+*.pem
+*.key
+*.dump
+
+# Private backup bundles
+backups/
+**/backup-*/
+**/.pending-*/
+**/database-role.json
+**/files.tar.gz

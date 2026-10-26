@@ -1,0 +1,33 @@
+{
+  "name": "clex-mqtt-workspace",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": [
+    "frontend"
+  ],
+  "scripts": {
+    "ui:dev": "npm run dev --workspace frontend",
+    "ui:build": "npm run build --workspace frontend",
+    "test:ui": "node scripts/ui-smoke.mjs",
+    "test:diagnostics-ui": "node scripts/diagnostics-ui.mjs",
+    "test:messages-ui": "node scripts/messages-ui.mjs",
+    "test:access-ui": "node scripts/access-ui.mjs",
+    "test:certificates-ui": "node scripts/certificates-ui.mjs",
+    "test:mqtt": "node scripts/smoke.mjs",
+    "test:mtls": "python3 scripts/test_mtls.py",
+    "test:bridges": "python3 scripts/test_bridges.py",
+    "test:bridges-ui": "node scripts/bridges-ui.mjs",
+    "bench:mqtt": "python3 scripts/benchmark.py",
+    "test:monitoring-ui": "node scripts/monitoring-ui.mjs",
+    "db:generate": "prisma migrate dev --create-only --schema db/schema.prisma",
+    "db:status": "prisma migrate status --schema db/schema.prisma",
+    "test:audit-ui": "node scripts/audit-ui.mjs",
+    "test:accounts-ui": "npm run ui:build && cargo build --locked && python3 scripts/test_accounts_ui.py"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.64.1",
+    "mqtt": "5.16.1",
+    "prisma": "6.19.0"
+  },
+  "license": "MIT"
+}

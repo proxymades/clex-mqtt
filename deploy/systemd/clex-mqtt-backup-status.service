@@ -1,0 +1,19 @@
+[Unit]
+Description=CLEX MQTT local backup status metrics
+After=prometheus-node-exporter.service
+
+[Service]
+Type=oneshot
+User=root
+Group=root
+ExecStart=/usr/bin/python3 /usr/local/sbin/clex-mqtt-backup-status
+TimeoutStartSec=30s
+UMask=0077
+NoNewPrivileges=true
+CapabilityBoundingSet=
+AmbientCapabilities=
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+ReadWritePaths=/var/lib/prometheus/node-exporter/clex-mqtt

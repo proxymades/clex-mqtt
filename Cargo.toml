@@ -1,0 +1,56 @@
+[package]
+name = "clex-mqtt"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.93"
+description = "MQTT broker with an embedded management console"
+license = "MIT"
+publish = false
+
+[dependencies]
+anyhow = "1"
+argon2 = { version = "0.5", features = ["std"] }
+axum = { version = "0.8", features = ["ws"] }
+base64 = "0.22"
+bytes = "1"
+chrono = { version = "0.4", features = ["serde"] }
+clap = { version = "4", features = ["derive", "env"] }
+dotenvy = "0.15"
+futures-util = { version = "0.3", features = ["sink"] }
+mime_guess = "2"
+prometheus-client = "=0.25.1"
+rand = "0.8"
+ring = "0.17"
+rmqtt-codec = "=0.2.2"
+rumqttc = { version = "=0.25.1", default-features = false, features = ["use-rustls-no-provider"] }
+rust-embed = "8"
+rustls = { version = "0.23", default-features = false, features = ["std", "ring", "tls12"] }
+rustls-pemfile = "2"
+rustls-native-certs = "0.8"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.10"
+stringprep = "0.1"
+subtle = "2.6"
+sqlx = { version = "0.8.6", default-features = false, features = ["runtime-tokio", "tls-rustls-ring", "postgres", "uuid", "chrono", "json", "migrate", "macros"] }
+thiserror = "2"
+tokio = { version = "1", features = ["full"] }
+tokio-rustls = { version = "0.26", default-features = false, features = ["ring", "tls12"] }
+tokio-util = { version = "0.7", features = ["codec", "rt"] }
+tower = { version = "0.5", features = ["util"] }
+tower-http = { version = "0.6", features = ["trace", "limit", "set-header", "sensitive-headers"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+uuid = { version = "1", features = ["v4", "serde"] }
+url = "2"
+x509-parser = "=0.18.1"
+
+[dev-dependencies]
+http-body-util = "0.1"
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "json", "cookies"] }
+tempfile = "3"
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+strip = true
