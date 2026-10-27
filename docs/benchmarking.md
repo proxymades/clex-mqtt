@@ -9,7 +9,7 @@ npm run bench:mqtt -- --publishers 4 --subscribers 8 --messages 1000 --qos 1 --w
 npm run bench:mqtt -- --protocol 4 --qos all
 ```
 
-Матрица коротких нагрузок с одинаковым payload и окном издателя:
+Набор коротких нагрузок с одинаковым payload и окном издателя:
 
 ```bash
 npm run bench:mqtt -- --publishers 1 --subscribers 1 --messages 100 --window 8
