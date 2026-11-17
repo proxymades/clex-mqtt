@@ -21,6 +21,8 @@ pub struct Config {
     pub max_accounts: i64,
     pub max_packet_size: usize,
     pub max_connections: usize,
+    pub auth_concurrency: usize,
+    pub connect_limits: crate::admission::ConnectLimits,
     pub max_inflight: u16,
     pub max_pending: usize,
     pub max_pending_bytes: usize,
@@ -115,6 +117,26 @@ impl Config {
             database_connections: parse("CLEX_DB_MAX_CONNECTIONS", "10")?,
             max_packet_size: parse("CLEX_MAX_PACKET_BYTES", "1048576")?,
             max_connections: parse("CLEX_MAX_CONNECTIONS", "1000")?,
+            auth_concurrency: parse("CLEX_MQTT_AUTH_CONCURRENCY", "1")?,
+            connect_limits: crate::admission::ConnectLimits {
+                global: crate::admission::Rate {
+                    burst: parse("CLEX_MQTT_CONNECT_BURST", "20")?,
+                    refill: Duration::from_millis(parse("CLEX_MQTT_CONNECT_REFILL_MS", "200")?),
+                },
+                source: crate::admission::Rate {
+                    burst: parse("CLEX_MQTT_IP_CONNECT_BURST", "10")?,
+                    refill: Duration::from_millis(parse("CLEX_MQTT_IP_CONNECT_REFILL_MS", "1000")?),
+                },
+                account: crate::admission::Rate {
+                    burst: parse("CLEX_MQTT_ACCOUNT_CONNECT_BURST", "10")?,
+                    refill: Duration::from_millis(parse(
+                        "CLEX_MQTT_ACCOUNT_CONNECT_REFILL_MS",
+                        "5000",
+                    )?),
+                },
+                pending: parse("CLEX_MQTT_MAX_HANDSHAKES", "32")?,
+                pending_per_ip: parse("CLEX_MQTT_MAX_HANDSHAKES_PER_IP", "2")?,
+            },
             max_inflight: parse("CLEX_MAX_INFLIGHT", "32")?,
             max_pending: parse("CLEX_MAX_PENDING", "10000")?,
             max_pending_bytes: parse("CLEX_MAX_PENDING_BYTES", "67108864")?,
@@ -125,6 +147,11 @@ impl Config {
             tls_client_ca,
             shutdown_timeout: Duration::from_secs(parse("CLEX_SHUTDOWN_TIMEOUT_SECS", "10")?),
         };
+        config.connect_limits.validate()?;
+        ensure!(
+            (1..=32).contains(&config.auth_concurrency),
+            "CLEX_MQTT_AUTH_CONCURRENCY must be in 1..=32"
+        );
         ensure!(
             (2..=100).contains(&config.database_connections),
             "CLEX_DB_MAX_CONNECTIONS must be in 2..=100"

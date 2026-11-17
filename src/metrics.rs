@@ -215,6 +215,26 @@ pub fn render(
             broker.capacity_rejections,
         ),
         (
+            "connection_rate_rejections",
+            "Transport attempts rejected before TLS or MQTT authentication",
+            broker.connection_rate_rejections,
+        ),
+        (
+            "account_connection_rate_rejections",
+            "CONNECT attempts rejected by account admission before password verification",
+            broker.account_connection_rate_rejections,
+        ),
+        (
+            "handshake_capacity_rejections",
+            "Transport attempts rejected by pending handshake capacity",
+            broker.handshake_capacity_rejections,
+        ),
+        (
+            "password_verifications",
+            "MQTT password checks admitted to the bounded worker pool",
+            broker.password_checks,
+        ),
+        (
             "packets_received",
             "Decoded MQTT packets received including control packets",
             broker.messages_received,

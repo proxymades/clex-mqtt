@@ -3,6 +3,7 @@ pub const INSTANCE_LOCK: i64 = 0x434c45584d515454;
 
 pub mod accounts;
 pub mod acl;
+pub mod admission;
 pub mod auth;
 pub mod bridge;
 pub mod broker;

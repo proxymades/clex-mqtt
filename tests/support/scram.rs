@@ -434,7 +434,7 @@ async fn scram_reauthentication_rejects_identity_switches_replays_and_unsolicite
 async fn scram_challenges_expire_and_password_rotation_fences_preparation() -> Result<()> {
     let h = Harness::start_with(BrokerConfig {
         handshake_timeout: Duration::from_millis(700),
-        ..Default::default()
+        ..wire_config()
     })
     .await?
     .unwrap();

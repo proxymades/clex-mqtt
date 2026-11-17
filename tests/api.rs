@@ -25,6 +25,8 @@ mod diagnostics_api;
 mod login_security;
 #[path = "support/metrics_api.rs"]
 mod metrics_api;
+#[path = "support/websocket_admission.rs"]
+mod websocket_admission;
 
 struct Harness {
     pool: PgPool,
@@ -217,6 +219,8 @@ impl Harness {
             database_connections: 8,
             max_packet_size: 1048576,
             max_connections: 100,
+            auth_concurrency: 1,
+            connect_limits: Default::default(),
             max_inflight: 16,
             max_pending: 100,
             max_pending_bytes: 1048576,

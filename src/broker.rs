@@ -1,6 +1,7 @@
 //! MQTT connection tasks own their protocol state. A bounded actor owns the live
 //! connection registry; durable routing and QoS state live in PostgreSQL.
 mod authentication;
+use crate::admission::{ConnectLimits, ConnectionAdmission, ConnectionControl};
 mod delivery_ack;
 use delivery_ack::OutgoingAck;
 use std::{
@@ -51,6 +52,7 @@ pub struct BrokerConfig {
     pub shutdown_timeout: Duration,
     pub topic_alias_maximum: u16,
     pub auth_concurrency: usize,
+    pub connect_limits: ConnectLimits,
 }
 
 impl Default for BrokerConfig {
@@ -66,7 +68,8 @@ impl Default for BrokerConfig {
             write_timeout: Duration::from_secs(10),
             shutdown_timeout: Duration::from_secs(10),
             topic_alias_maximum: 32,
-            auth_concurrency: 8,
+            auth_concurrency: 1,
+            connect_limits: ConnectLimits::default(),
         }
     }
 }
@@ -91,6 +94,10 @@ pub struct BrokerMetrics {
     pub connections_authenticated: u64,
     pub handshake_failures: u64,
     pub capacity_rejections: u64,
+    pub connection_rate_rejections: u64,
+    pub handshake_capacity_rejections: u64,
+    pub account_connection_rate_rejections: u64,
+    pub password_checks: u64,
     pub connected_clients: u64,
     pub connections_total: u64,
     pub messages_received: u64,
@@ -104,6 +111,7 @@ pub struct BrokerMetrics {
 #[derive(Default)]
 struct Counters {
     connections_authenticated: AtomicU64,
+    password_checks: AtomicU64,
     handshake_failures: AtomicU64,
     capacity_rejections: AtomicU64,
     connected_clients: AtomicU64,
@@ -165,6 +173,7 @@ pub struct Broker {
     counters: Arc<Counters>,
     connections: Arc<Semaphore>,
     auth: Arc<Semaphore>,
+    admission: ConnectionControl,
     stop: CancellationToken,
     maintenance_stopped: CancellationToken,
 }
@@ -225,6 +234,7 @@ struct ConnectInfo {
 
 impl Broker {
     pub async fn new(store: Store, config: BrokerConfig) -> Result<Self> {
+        config.connect_limits.validate()?;
         ensure!(
             (128..=268_435_455).contains(&config.max_packet_size),
             "invalid MQTT packet limit"
@@ -253,6 +263,7 @@ impl Broker {
             store,
             connections: Arc::new(Semaphore::new(config.max_connections)),
             auth: Arc::new(Semaphore::new(config.auth_concurrency)),
+            admission: ConnectionControl::new(config.connect_limits.clone())?,
             config: Arc::new(config),
             registry,
             counters,
@@ -326,6 +337,10 @@ impl Broker {
             connections_authenticated: c.connections_authenticated.load(Ordering::Relaxed),
             handshake_failures: c.handshake_failures.load(Ordering::Relaxed),
             capacity_rejections: c.capacity_rejections.load(Ordering::Relaxed),
+            connection_rate_rejections: self.admission.rejections().0,
+            handshake_capacity_rejections: self.admission.rejections().1,
+            account_connection_rate_rejections: self.admission.rejections().2,
+            password_checks: c.password_checks.load(Ordering::Relaxed),
             connected_clients: c.connected_clients.load(Ordering::Relaxed),
             connections_total: c.connections_total.load(Ordering::Relaxed),
             messages_received: c.messages_received.load(Ordering::Relaxed),
@@ -391,6 +406,11 @@ impl Broker {
         Ok(())
     }
 
+    pub fn admit_connection(&self, peer: SocketAddr) -> Result<ConnectionAdmission> {
+        ensure!(!self.stop.is_cancelled(), "broker is shutting down");
+        Ok(self.admission.admit(peer.ip())?)
+    }
+
     pub async fn run_io<T>(&self, io: T, peer: SocketAddr) -> Result<()>
     where
         T: AsyncRead + AsyncWrite + Unpin + Send + 'static,
@@ -407,7 +427,25 @@ impl Broker {
     where
         T: AsyncRead + AsyncWrite + Unpin + Send + 'static,
     {
+        let admission = self.admit_connection(peer)?;
+        self.run_admitted_io(io, peer, certificate, admission).await
+    }
+
+    pub async fn run_admitted_io<T>(
+        &self,
+        io: T,
+        peer: SocketAddr,
+        certificate: Option<crate::tls::VerifiedClientCertificate>,
+        admission: ConnectionAdmission,
+    ) -> Result<()>
+    where
+        T: AsyncRead + AsyncWrite + Unpin + Send + 'static,
+    {
         ensure!(!self.stop.is_cancelled(), "broker is shutting down");
+        ensure!(
+            self.admission.owns(&admission, peer.ip()),
+            "invalid MQTT admission"
+        );
         let _permit = match self.connections.clone().try_acquire_owned() {
             Ok(permit) => permit,
             Err(error) => {
@@ -435,6 +473,7 @@ impl Broker {
                 return Err(error);
             }
         };
+        drop(admission);
         let outcome = self.connection_loop(&mut wire, &mut connection).await;
         self.diagnostics().session_event(
             connection.session_id,

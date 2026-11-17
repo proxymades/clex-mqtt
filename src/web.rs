@@ -166,18 +166,34 @@ async fn mqtt_websocket(
     if !protocol.split(',').any(|part| part.trim() == "mqtt") {
         return Err(ApiError::bad("WebSocket requires the mqtt subprotocol."));
     }
+    let ip = security::client_ip(peer, &headers, &state.config.http_trusted_proxy_ips)?;
+    let peer = SocketAddr::new(ip, peer.port());
+    let admission = state.broker.admit_connection(peer).map_err(|_| {
+        ApiError(
+            StatusCode::TOO_MANY_REQUESTS,
+            "MQTT_CONNECT_LIMIT",
+            "Слишком много MQTT-подключений. Повторите позже.",
+        )
+    })?;
     Ok(ws
         .protocols(["mqtt"])
         .max_message_size(state.config.max_packet_size)
         .max_frame_size(state.config.max_packet_size)
-        .on_upgrade(move |socket| websocket_io(socket, state.broker, peer))
+        .on_upgrade(move |socket| websocket_io(socket, state.broker, peer, admission))
         .into_response())
 }
 
-async fn websocket_io(socket: WebSocket, broker: Broker, peer: SocketAddr) {
+async fn websocket_io(
+    socket: WebSocket,
+    broker: Broker,
+    peer: SocketAddr,
+    admission: crate::admission::ConnectionAdmission,
+) {
     let (server_io, proxy_io) = tokio::io::duplex(64 * 1024);
     let task = tokio::spawn(async move {
-        let _ = broker.run_io(server_io, peer).await;
+        let _ = broker
+            .run_admitted_io(server_io, peer, None, admission)
+            .await;
     });
     let (mut sink, mut stream) = socket.split();
     let (mut reader, mut writer) = tokio::io::split(proxy_io);
@@ -804,7 +820,7 @@ async fn overview(State(state): State<WebState>, headers: HeaderMap) -> ApiResul
         json!({"name":"Диагностика отдельного сообщения","status":"available","detail":"Сбор по источнику или топику: подписки, очередь, отправка и подтверждения QoS. Ограниченный буфер и сеанс до 5 минут."}),
     ];
     Ok(Json(
-        json!({"version":env!("CARGO_PKG_VERSION"),"uptimeSeconds":state.started.elapsed().as_secs(),"activeConnections":metrics.connected_clients,"storedSessions":counts.get::<i64,_>("sessions"),"subscriptions":counts.get::<i64,_>("subscriptions"),"retainedMessages":counts.get::<i64,_>("retained"),"queuedMessages":counts.get::<i64,_>("deliveries"),"incomingMessages":metrics.messages_received,"outgoingMessages":metrics.messages_sent,"rejectedConnections":metrics.handshake_failures+metrics.capacity_rejections,"rejectedPublications":metrics.publish_rejected,"database":{"healthy":true},"listeners":listeners,"capabilities":capabilities,"monitoring":{"enabled":state.config.metrics_token.is_some(),"path":"/metrics","databaseSnapshotSeconds":crate::metrics::CACHE_SECONDS}}),
+        json!({"version":env!("CARGO_PKG_VERSION"),"uptimeSeconds":state.started.elapsed().as_secs(),"activeConnections":metrics.connected_clients,"storedSessions":counts.get::<i64,_>("sessions"),"subscriptions":counts.get::<i64,_>("subscriptions"),"retainedMessages":counts.get::<i64,_>("retained"),"queuedMessages":counts.get::<i64,_>("deliveries"),"incomingMessages":metrics.messages_received,"outgoingMessages":metrics.messages_sent,"rejectedConnections":metrics.handshake_failures+metrics.capacity_rejections+metrics.connection_rate_rejections+metrics.handshake_capacity_rejections,"rejectedPublications":metrics.publish_rejected,"database":{"healthy":true},"listeners":listeners,"capabilities":capabilities,"monitoring":{"enabled":state.config.metrics_token.is_some(),"path":"/metrics","databaseSnapshotSeconds":crate::metrics::CACHE_SECONDS}}),
     ))
 }
 

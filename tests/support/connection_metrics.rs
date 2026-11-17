@@ -5,7 +5,7 @@ use super::*;
 async fn connection_metrics_distinguish_capacity_rejection_from_authentication() -> Result<()> {
     let h = Harness::start_with(BrokerConfig {
         max_connections: 1,
-        ..Default::default()
+        ..wire_config()
     })
     .await?
     .context("broker")?;

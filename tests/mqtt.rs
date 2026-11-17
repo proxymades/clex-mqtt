@@ -20,6 +20,8 @@ use uuid::Uuid;
 
 #[path = "support/bridges.rs"]
 mod bridges;
+#[path = "support/connection_admission.rs"]
+mod connection_admission;
 #[path = "support/connection_metrics.rs"]
 mod connection_metrics;
 #[path = "support/diagnostics_wire.rs"]
@@ -41,9 +43,27 @@ struct Harness {
     server: JoinHandle<()>,
 }
 
+fn wire_config() -> BrokerConfig {
+    let rate = clex_mqtt::admission::Rate {
+        burst: 1000,
+        refill: Duration::from_millis(1),
+    };
+    BrokerConfig {
+        auth_concurrency: 8,
+        connect_limits: clex_mqtt::admission::ConnectLimits {
+            global: rate.clone(),
+            source: rate.clone(),
+            account: rate,
+            pending: 128,
+            pending_per_ip: 128,
+        },
+        ..Default::default()
+    }
+}
+
 impl Harness {
     async fn start() -> Result<Option<Self>> {
-        Self::start_with(BrokerConfig::default()).await
+        Self::start_with(wire_config()).await
     }
     async fn start_with(config: BrokerConfig) -> Result<Option<Self>> {
         let url = env::var("TEST_DATABASE_URL")
@@ -1074,7 +1094,7 @@ async fn shared_inner_filter_starting_with_share_is_a_literal_topic_after_one_pr
 async fn shared_online_full_member_falls_back_and_all_full_returns_negative_puback() -> Result<()> {
     let Some(h) = Harness::start_with(BrokerConfig {
         max_pending: 1,
-        ..Default::default()
+        ..wire_config()
     })
     .await?
     else {
@@ -1447,7 +1467,7 @@ async fn rejects_anonymous_and_wrong_password_without_opening_a_session() -> Res
 async fn inbound_qos2_quota_rejects_without_losing_prior_transaction() -> Result<()> {
     let Some(h) = Harness::start_with(BrokerConfig {
         max_pending: 1,
-        ..Default::default()
+        ..wire_config()
     })
     .await?
     else {
@@ -1497,7 +1517,7 @@ async fn inbound_qos2_quota_rejects_without_losing_prior_transaction() -> Result
 async fn outgoing_quota_negative_puback_and_pubrel_recovery_are_transactional() -> Result<()> {
     let Some(h) = Harness::start_with(BrokerConfig {
         max_pending: 1,
-        ..Default::default()
+        ..wire_config()
     })
     .await?
     else {
@@ -1741,7 +1761,7 @@ async fn receive_maximum_one_keeps_qos2_slot_until_pubcomp_and_accepts_control_p
 async fn topic_alias_mapping_reassigns_resets_and_reports_specific_errors() -> Result<()> {
     let Some(h) = Harness::start_with(BrokerConfig {
         topic_alias_maximum: 2,
-        ..Default::default()
+        ..wire_config()
     })
     .await?
     else {
@@ -1794,7 +1814,7 @@ async fn topic_alias_mapping_reassigns_resets_and_reports_specific_errors() -> R
 async fn maximum_packet_size_accepts_exact_boundary_and_rejects_oversize_header() -> Result<()> {
     let Some(h) = Harness::start_with(BrokerConfig {
         max_packet_size: 128,
-        ..Default::default()
+        ..wire_config()
     })
     .await?
     else {

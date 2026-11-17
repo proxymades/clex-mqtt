@@ -17,7 +17,7 @@ use std::{
     sync::Arc,
     time::Duration,
 };
-use tokio::{net::TcpListener, sync::Semaphore, task::JoinSet};
+use tokio::{net::TcpListener, task::JoinSet};
 use tokio_rustls::TlsAcceptor;
 use tokio_util::sync::CancellationToken;
 use tracing_subscriber::EnvFilter;
@@ -231,6 +231,8 @@ async fn serve(config: Arc<Config>, pool: PgPool) -> Result<()> {
             max_pending: config.max_pending,
             max_pending_bytes: config.max_pending_bytes,
             shutdown_timeout: config.shutdown_timeout,
+            auth_concurrency: config.auth_concurrency,
+            connect_limits: config.connect_limits.clone(),
             ..Default::default()
         },
     )
@@ -302,9 +304,10 @@ async fn tcp_loop(listener: TcpListener, broker: Broker, stop: CancellationToken
             _ = stop.cancelled() => break,
             accepted = listener.accept() => {
                 let (stream,peer) = accepted?;
+                let Ok(admission) = broker.admit_connection(peer) else { continue; };
                 stream.set_nodelay(true)?;
                 let broker = broker.clone();
-                tasks.spawn(async move { let _ = broker.run_io(stream,peer).await; });
+                tasks.spawn(async move { let _ = broker.run_admitted_io(stream,peer,None,admission).await; });
             },
             _ = tasks.join_next(), if !tasks.is_empty() => (),
         }
@@ -319,22 +322,20 @@ async fn tls_loop(
     broker: Broker,
     stop: CancellationToken,
 ) -> Result<()> {
-    let handshakes = Arc::new(Semaphore::new(64));
     let mut tasks = JoinSet::new();
     loop {
         tokio::select! {
             _ = stop.cancelled() => break,
             accepted = listener.accept() => {
                 let (stream,peer) = accepted?;
-                let Ok(permit) = handshakes.clone().try_acquire_owned() else { continue; };
+                let Ok(admission) = broker.admit_connection(peer) else { continue; };
                 let acceptor = acceptor.clone();
                 let broker = broker.clone();
                 tasks.spawn(async move {
                     let accepted = tokio::time::timeout(Duration::from_secs(10),acceptor.accept(stream)).await;
-                    drop(permit);
                     if let Ok(Ok(stream))=accepted
                         && let Ok(certificate)=clex_mqtt::tls::verified_client(stream.get_ref().1) {
-                        let _=broker.run_io_with_certificate(stream,peer,certificate).await;
+                        let _=broker.run_admitted_io(stream,peer,certificate,admission).await;
                     }
                 });
             },

@@ -131,7 +131,10 @@ impl Wire {
     }
 }
 
+// Binary fixtures share the database-wide instance ownership lock.
+static TLS_TEST_LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
 struct Harness {
+    _test_guard: tokio::sync::MutexGuard<'static, ()>,
     root: PgPool,
     pool: PgPool,
     schema: String,
@@ -151,6 +154,7 @@ fn address() -> Result<SocketAddr> {
 
 impl Harness {
     async fn new() -> Result<Self> {
+        let test_guard = TLS_TEST_LOCK.lock().await;
         let pki = Pki::new()?;
         let value =
             std::env::var("TEST_DATABASE_URL").context("TLS tests require TEST_DATABASE_URL")?;
@@ -201,6 +205,7 @@ impl Harness {
             .query_pairs_mut()
             .append_pair("options", &format!("-csearch_path={schema}"));
         Ok(Self {
+            _test_guard: test_guard,
             root,
             pool,
             schema,
@@ -219,6 +224,9 @@ impl Harness {
     }
 
     async fn start(&mut self, mode: ClientAuth) -> Result<()> {
+        self.start_with_admission(mode, false).await
+    }
+    async fn start_with_admission(&mut self, mode: ClientAuth, strict: bool) -> Result<()> {
         self.stop().await?;
         let mut command = Command::new(env!("CARGO_BIN_EXE_clex-mqtt"));
         command
@@ -227,6 +235,10 @@ impl Harness {
             .env("PATH", std::env::var_os("PATH").unwrap_or_default())
             .env("DATABASE_URL", self.database_url.as_str())
             .env("CLEX_ENV", "test")
+            .env("CLEX_MQTT_CONNECT_BURST", "1000")
+            .env("CLEX_MQTT_IP_CONNECT_BURST", "1000")
+            .env("CLEX_MQTT_ACCOUNT_CONNECT_BURST", "1000")
+            .env("CLEX_MQTT_MAX_HANDSHAKES_PER_IP", "32")
             .env("CLEX_MQTT_ADDR", self.mqtt.to_string())
             .env("CLEX_TLS_ADDR", self.tls.to_string())
             .env(
@@ -242,6 +254,11 @@ impl Harness {
             .stdout(Stdio::null())
             .stderr(Stdio::null())
             .kill_on_drop(true);
+        if strict {
+            command
+                .env("CLEX_MQTT_MAX_HANDSHAKES_PER_IP", "1")
+                .env("CLEX_MQTT_MAX_HANDSHAKES", "4");
+        }
         if mode != ClientAuth::None {
             command.env("CLEX_TLS_CLIENT_CA_FILE", self.pki.path("ca.pem"));
         }
@@ -642,6 +659,40 @@ async fn binary_mtls_chain_binding_policy_rotation_and_revocation() -> Result<()
                 == 0
         );
         normal.disconnect().await?;
+        Ok(())
+    }
+    .await;
+    let cleanup = h.close().await;
+    outcome?;
+    cleanup
+}
+
+#[tokio::test]
+#[ignore = "requires isolated PostgreSQL TEST_DATABASE_URL and OpenSSL"]
+async fn pending_transport_admission_is_shared_before_tls_and_mqtt_connect() -> Result<()> {
+    let mut h = Harness::new().await?;
+    let outcome: Result<()> = async {
+        h.start_with_admission(ClientAuth::None, true).await?;
+        let tls_pending = TcpStream::connect(h.tls).await?;
+        let mut limited = TcpStream::connect(h.mqtt).await?;
+        let mut byte = [0u8; 1];
+        ensure!(
+            timeout(Duration::from_secs(2), limited.read(&mut byte)).await?? == 0,
+            "TLS handshake must reserve admission before ClientHello"
+        );
+        drop(tls_pending);
+        timeout(Duration::from_secs(3), async {
+            loop {
+                let mut candidate = TcpStream::connect(h.mqtt).await?;
+                match timeout(Duration::from_millis(100), candidate.read(&mut byte)).await {
+                    Err(_) => break,
+                    Ok(Ok(0)) => tokio::time::sleep(Duration::from_millis(10)).await,
+                    other => anyhow::bail!("unexpected pre-CONNECT outcome: {other:?}"),
+                }
+            }
+            Ok::<(), anyhow::Error>(())
+        })
+        .await??;
         Ok(())
     }
     .await;

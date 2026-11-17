@@ -100,6 +100,14 @@ impl Broker {
             self.connack(wire, false, 0x87, None).await?;
             anyhow::bail!("client identifier is not authorized");
         }
+        if self
+            .admission
+            .account(credential.owner_id, credential.id)
+            .is_err()
+        {
+            self.connack(wire, false, 0x9f, None).await?;
+            anyhow::bail!("MQTT account connection rate exceeded");
+        }
         if let Some(first) = first {
             let Some(verifier) = credential.scram_verifier.clone() else {
                 self.connack(wire, false, 0x86, None).await?;
@@ -177,6 +185,9 @@ impl Broker {
         )
         .await
         .context("authentication queue timeout")??;
+        self.counters
+            .password_checks
+            .fetch_add(1, Ordering::Relaxed);
         let password = password.to_owned();
         let hash = credential.password_hash.clone();
         let upgrade = credential.scram_verifier.is_none();
