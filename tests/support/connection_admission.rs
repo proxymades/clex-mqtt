@@ -56,7 +56,8 @@ async fn connect_reply(
     string(&mut body, "MQTT");
     body.push(version);
     body.push(0xc2);
-    body.extend_from_slice(&300u16.to_be_bytes());
+    // Admission fixtures can remain idle during password-heavy setup on shared runners.
+    body.extend_from_slice(&0u16.to_be_bytes());
     if version == 5 {
         body.push(0);
     }
@@ -141,7 +142,9 @@ async fn hundred_connected_accounts_keep_publishing_while_another_account_is_thr
         .await?
         .context("broker")?;
     let outcome: Result<()> = async {
-        let mut reader = h.client(5, "stable-observer", true).await?;
+        let (mut reader, reason) =
+            connect_reply(h.address, 5, "stable-observer", "wire-test").await?;
+        ensure!(reason == 0);
         reader.subscribe("accounts/#", 0, 1).await?;
         let mut clients = Vec::new();
         for index in 0..100 {
@@ -187,7 +190,10 @@ async fn hundred_connected_accounts_keep_publishing_while_another_account_is_thr
         let mut topics = std::collections::HashSet::new();
         for _ in 0..100 {
             let (header, body) = reader.read().await?;
-            ensure!(header >> 4 == 3);
+            ensure!(
+                header >> 4 == 3,
+                "expected PUBLISH, received {header:#04x} {body:?}"
+            );
             let length = usize::from(u16::from_be_bytes([body[0], body[1]]));
             topics.insert(String::from_utf8(body[2..2 + length].to_vec())?);
         }
