@@ -700,3 +700,42 @@ async fn pending_transport_admission_is_shared_before_tls_and_mqtt_connect() -> 
     outcome?;
     cleanup
 }
+
+#[tokio::test]
+#[ignore = "requires isolated PostgreSQL TEST_DATABASE_URL and OpenSSL"]
+async fn mqtt311_qos1_publish_closes_tls_cleanly_after_disconnect() -> Result<()> {
+    let mut h = Harness::new().await?;
+    let outcome: Result<()> = async {
+        h.start(ClientAuth::None).await?;
+        let mut wire = h.tls_wire(None).await?;
+        ensure!(
+            wire.connect(
+                4,
+                "one-shot-publisher",
+                Some("alpha-user"),
+                Some("tls-test-password")
+            )
+            .await?
+                == 0
+        );
+        let mut publish = Vec::new();
+        string(&mut publish, "tls/one-shot");
+        publish.extend_from_slice(&[0, 1]);
+        publish.extend_from_slice(b"test message");
+        wire.send(0x32, &publish).await?;
+        ensure!(wire.read().await? == (0x40, vec![0, 1]), "expected PUBACK");
+
+        wire.send(0xe0, &[]).await?;
+        wire.io.shutdown().await?;
+        let mut byte = [0u8];
+        let read = timeout(Duration::from_secs(3), wire.io.read(&mut byte))
+            .await?
+            .context("expected a clean TLS close after MQTT DISCONNECT")?;
+        ensure!(read == 0);
+        Ok(())
+    }
+    .await;
+    let cleanup = h.close().await;
+    outcome?;
+    cleanup
+}

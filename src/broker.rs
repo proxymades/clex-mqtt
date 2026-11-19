@@ -516,6 +516,10 @@ impl Broker {
                 generation: connection.generation,
             })
             .await;
+        if graceful {
+            // Let the transport finish its write side (including TLS close_notify).
+            let _ = timeout(self.config.write_timeout, wire.close()).await;
+        }
         outcome.map(|_| ())
     }
 
